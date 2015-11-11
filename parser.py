@@ -3,12 +3,20 @@
 import re
 import urllib2
 import datetime
-# from contextlib import closing
 from selenium.webdriver import Firefox
 from selenium.webdriver.support.ui import WebDriverWait
 
 
 class Base:
+    hdr = {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 Gecko) Chrome/23.0.1271.64 Safari/537.11',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Charset': 'utf-8;q=0.7,*;q=0.3',
+        'Accept-Encoding': 'none',
+        'Connection': 'close'}
+
+    timeout = 10
+
     def __init__(self):
         pass
 
@@ -20,7 +28,7 @@ class Base:
 
         # когда нам нужны новости только за один день
         if date1 == date2:
-            dates = [[year1, month1, day1]]
+            dates = [[date1.split('.')[2], date1.split('.')[1], date1.split('.')[0]]]
 
         # когда у нас период
         else:
@@ -41,85 +49,96 @@ class Base:
 
     # нужно для открытия конкретных статей
     def open_site(self, url):
-        hdr = {
-            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 Gecko) Chrome/23.0.1271.64 Safari/537.11',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Charset': 'utf-8;q=0.7,*;q=0.3',
-            'Accept-Encoding': 'none',
-            'Connection': 'close'}
 
-        req = urllib2.Request(url, headers=hdr)
-        res = urllib2.urlopen(req)
+        req = urllib2.Request(url, headers=self.hdr)
+        res = urllib2.urlopen(req, timeout=self.timeout)
 
         return str(res.read())
 
-# =================================================
+
+# =========================================================================================================
 #                Р И А - Н О В О С Т И
-# =================================================
+# =========================================================================================================
 class Ria(Base):
-    
-    timeout = 20
+    main_site = 'http://ria.ru'
+    timeout = 50
     browser = Firefox()
+
     exprs_for_text = (
         re.compile('<h1.+</h1>'),
         re.compile('<div style="overflow.+[0-9]+</div>(.+)<div style'))
-    
-    expr_for_main_block = re.compile('(<strong>.+)</div><div id="facebook-userbar-article-end"', re.DOTALL)
-    expr_for_parsing_main_block =  re.compile('<p>.+</p>')   
+
+    expr_for_main_block = re.compile('>([А-Я]+\-*[А-Я]+\-*[А-Я]+,.+)</div><div id="facebook-userbar-article-end"',
+                                     re.DOTALL)
+    expr_for_parsing_main_block = re.compile('<p>.+</p>')
     # ненужные вставки в текст статьи    
     expr_for_brief = re.compile('(<div id="inject_.+</div>)[А-я]+')
-    
-    expr_for_date = re.compile('<div style="overflow.+>[0-9]{2}:[0-9]{2} ([0-9]{2}/[0-9]{2}/[0-9]{4})</div>.+<div style')
-    expr_for_time = re.compile('<div style="overflow.+>([0-9]{2}:[0-9]{2}) [0-9]{2}/[0-9]{2}/[0-9]{4}</div>.+<div style')
+
+    # для метадаты   "article_header_time">12:03</span>14.10.2014</time>
+    expr_for_date = re.compile(
+        'datetime="([0-9]+-[0-9]+-[0-9]+)T[0-9]+:[0-9]+">')
+    expr_for_time = re.compile(
+        'datetime="[0-9]+-[0-9]+-[0-9]+T([0-9]+:[0-9]+)">')
 
     # нужно для загрузки ВСЕХ новостей за день
-    def loading_full_page(self, url, pr_year, pr_month, pr_day):
-        
+    def loading_full_page(self, url, day, month, year, block):
+
         self.browser.get(url)
-        expr = pr_year + pr_month + pr_day + '/[0-9]+'
 
-        # пока не появятся новости предыдущего дня
-        while not re.compile(expr).findall(self.browser.page_source):
-            button = self.browser.find_element_by_class_name('list_pagination_next')
-            button.click()
-            # wait for the page to load
-            WebDriverWait(self.browser, timeout = self.timeout).until(
-                lambda x: x.find_element_by_class_name('list_pagination_next'))
+        # регулярка для ссылок на нужный день
+        expr_current_day = re.compile(
+            '<h3 class="list_item_title"><a href="' + block + year + month + day + '/[0-9]+')
 
-        page_source = self.browser.page_source
+        # регулярка для ВСЕХ ссылок на статьи
+        expr_other_day = re.compile('<h3 class="list_item_title"><a href="' + block + '[0-9]+/[0-9]+')
 
-        return page_source
+        # пока не появятся новости предыдущих дней
+        while len(expr_current_day.findall(self.browser.page_source)) != 0 and \
+                    expr_current_day.findall(self.browser.page_source)[-1] == \
+                    expr_other_day.findall(self.browser.page_source)[-1]:
+
+            try:
+                button = self.browser.find_element_by_class_name('list_pagination_next')
+                button.click()
+                # wait for the page to load
+                WebDriverWait(self.browser, timeout=self.timeout)
+
+            except:
+                self.browser.get(url)
+
+        return self.browser.page_source
 
     # вытаскиваем текст из статьи
     def get_text(self, url):
-        print url
+
         text = []
-        article = self.open_site('http://ria.ru' + url)
-        
+        article = self.open_site(self.main_site + url)
+
         for expr in self.exprs_for_text:
             text.extend(list(set(expr.findall(article))))
-            
+
         main_block = self.expr_for_main_block.findall(article)
         text.extend(self.expr_for_parsing_main_block.findall(main_block[0]))
-        
-        metadata = self.get_metadata(article)
-        
+
         parsed_article = ['\n\n'.join(text)]
-        parsed_article.extend(metadata)
-        
+        parsed_article.extend(self.get_metadata(article))
+
         return parsed_article
 
     # добавляем дату и время   (HH:MM, DD/MM/YYYY)
     def get_metadata(self, article):
         metadata = []
-        
-        metadata.extend(self.expr_for_time.findall(article))
-        metadata.extend(self.expr_for_date.findall(article))
-        
+
+        metadata.extend(self.expr_for_time.findall(article)[0])  # время
+        metadata.extend(self.expr_for_date.findall(article)[0])  # дата
+
         return metadata
-    
+
     # получаем ссылки на статьи с привязкой к дате
     def get_news(self, since, by):  # даты разделять точкой (после года не ставить)
+
+        blocks = ['/politics/', '/society/', '/economy/', '/world/', '/incidents/', '/sport/', '/studies/',
+                  '/earth/', '/space/', '/optical_technologies/', '/culture/', '/religion_news/']
 
         list_all_parsed = []
         list_daily_news = []
@@ -131,26 +150,29 @@ class Ria(Base):
             month = list_of_days[index][1]
             year = list_of_days[index][0]
 
-            # предыдущая дата
-            if index == 0:
-                pr_day = day_out[2]
-                pr_month = day_out[1]
-                pr_year = day_out[0]
-            else:
-                pr_day = list_of_days[index - 1][2]
-                pr_month = list_of_days[index - 1][1]
-                pr_year = list_of_days[index - 1][0]
+            for block in blocks:
+                # общий сайт, где собраны все новости одного дня
+                site_list_daily_news = self.loading_full_page(self.main_site + block + year + month + day, day, month,
+                                                              year, block)
 
-            # общий сайт, где собраны все новости одного дня
-            site_list_daily_news = self.loading_full_page('http://ria.ru/world/' + year + month + day, pr_year, pr_month, pr_day)
+                # получаем ссылки на новости этого дня
+                expr_for_list_daily_news = re.compile('href="(' + block + year + month + day + '/[0-9]+\.html)"')
 
-            # получаем ссылки на новости этого дня
-            expr_for_list_daily_news = 'href="(/world/' + year + month + day + '/[0-9]+\.html)"'
-            expr_for_list_daily_news = re.compile(expr_for_list_daily_news)
+                list_daily_news.extend(list(set(expr_for_list_daily_news.findall(
+                    site_list_daily_news))))  # сет потому, что некоторые ссылки находит дважды
 
-            list_daily_news.extend(list(set(expr_for_list_daily_news.findall(site_list_daily_news))))
-
+        cracked_urls = []
         for url in list_daily_news:
-            list_all_parsed.append(self.get_text(url))
-            
+            print url
+            try:
+                list_all_parsed.append(self.get_text(url))
+            except:
+                cracked_urls.append(url)
+
+        open('crack.txt', 'w').write('\n\n'.join(cracked_urls))
         return list_all_parsed
+
+
+a = Ria()
+lt = a.get_news('14.10.2014', '14.10.2014')
+print len(lt)
