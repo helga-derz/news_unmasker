@@ -173,6 +173,51 @@ class Ria(Base):
         return list_all_parsed
 
 
-a = Ria()
-lt = a.get_news('14.10.2014', '14.10.2014')
-print len(lt)
+class Kommersant(Base):
+
+    main_site = 'http://www.kommersant.ru'
+
+    # регулярка для заголовка статьи
+    expr_for_title = re.compile('<title>Ъ-Новости - .+</title>')
+    # регулярка для тела статьи
+    expr_for_text = re.compile('class="article_text_wrapper">(.+)<!-- RSS Link -->', re.DOTALL)
+
+    def get_text(self, url):
+        article = self.open_site(self.main_site + url)
+#   СЮДАААААААААААААААААААААААААААААААААААА
+
+    def get_news(self, since, by):
+
+        list_of_days, day_out = self.make_days_list(since, by)[0], self.make_days_list(since, by)[1]
+        list_daily_news = []
+        list_all_parsed = []
+
+        for index in range(len(list_of_days)):
+
+            # нужная дата
+            day = list_of_days[index][2]
+            month = list_of_days[index][1]
+            year = list_of_days[index][0]
+
+            # общий сайт, где собраны все новости одного дня
+            site_list_daily_news = 'http://www.kommersant.ru/archive/news/77/' + year + '-' + month + '-' + day
+
+            # получаем блок со ссылками на новости этого дня
+            expr_for_block_list_daily_news = re.compile('<section class="b-other_docs">.+</section>', re.DOTALL)
+            block_of_news = expr_for_block_list_daily_news.findall(self.open_site(site_list_daily_news))
+
+            # получаем ссылки на все новости этого дня
+            expr_for_list_daily_news = re.compile('<h3 class="article_subheader"><a href="(/news/[0-9]+)">')
+
+            list_daily_news.extend(expr_for_list_daily_news.findall(block_of_news[0]))
+
+        for url in list_daily_news:
+            print url
+            list_all_parsed.append(self.get_text(url))
+
+        return list_daily_news
+
+a = Kommersant()
+lt = a.get_news('14.01.2015', '14.01.2015')
+
+
