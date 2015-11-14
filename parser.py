@@ -8,14 +8,13 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 
 class Base:
+    browser = Firefox()
     hdr = {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 Gecko) Chrome/23.0.1271.64 Safari/537.11',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Charset': 'utf-8;q=0.7,*;q=0.3',
         'Accept-Encoding': 'none',
         'Connection': 'close'}
-
-    timeout = 10
 
     def __init__(self):
         pass
@@ -51,9 +50,9 @@ class Base:
     def open_site(self, url):
 
         req = urllib2.Request(url, headers=self.hdr)
-        res = urllib2.urlopen(req, timeout=self.timeout)
+        page = urllib2.urlopen(req)
 
-        return str(res.read())
+        return str(page.read())
 
 
 # =========================================================================================================
@@ -62,7 +61,6 @@ class Base:
 class Ria(Base):
     main_site = 'http://ria.ru'
     timeout = 50
-    browser = Firefox()
 
     exprs_for_text = (
         re.compile('<h1.+</h1>'),
@@ -94,8 +92,8 @@ class Ria(Base):
 
         # пока не появятся новости предыдущих дней
         while len(expr_current_day.findall(self.browser.page_source)) != 0 and \
-                    expr_current_day.findall(self.browser.page_source)[-1] == \
-                    expr_other_day.findall(self.browser.page_source)[-1]:
+                expr_current_day.findall(self.browser.page_source)[-1] == \
+                expr_other_day.findall(self.browser.page_source)[-1]:
 
             try:
                 button = self.browser.find_element_by_class_name('list_pagination_next')
@@ -129,8 +127,8 @@ class Ria(Base):
     def get_metadata(self, article):
         metadata = []
 
-        metadata.extend(self.expr_for_time.findall(article)[0])  # время
-        metadata.extend(self.expr_for_date.findall(article)[0])  # дата
+        metadata.append(self.expr_for_time.findall(article)[0])  # время
+        metadata.append(self.expr_for_date.findall(article)[0])  # дата
 
         return metadata
 
@@ -169,22 +167,49 @@ class Ria(Base):
             except:
                 cracked_urls.append(url)
 
-        open('crack.txt', 'w').write('\n\n'.join(cracked_urls))
+        open('crack_ria.txt', 'w').write('\n'.join(cracked_urls))
         return list_all_parsed
 
 
+# =========================================================================================================
+#                К О М М Е Р С А Н Т
+# =========================================================================================================
+
 class Kommersant(Base):
-
     main_site = 'http://www.kommersant.ru'
+    timeout = 50
 
-    # регулярка для заголовка статьи
-    expr_for_title = re.compile('<title>Ъ-Новости - .+</title>')
-    # регулярка для тела статьи
-    expr_for_text = re.compile('class="article_text_wrapper">(.+)<!-- RSS Link -->', re.DOTALL)
+    # регулярка для заголовка и тела статьи
+    expr_for_text = re.compile('<title>.+</title>'), \
+        re.compile('<div id="divLetterBranding">(.+)</div>.+<!-- RSS Link -->', re.DOTALL)
+
+    # МЕТАДАТА
+    # регулярка для даты
+    expr_for_date = re.compile('([0-9]+\.[0-9]+\.[0-9]+), [0-9]+:[0-9]+')
+    # регулярка для времени
+    expr_for_time = re.compile('[0-9]+\.[0-9]+\.[0-9]+, ([0-9]+:[0-9]+)')
+
+    def get_metadata(self, article):
+        metadata = []
+
+        metadata.append(self.expr_for_time.findall(article)[0])  # время
+        metadata.append(self.expr_for_date.findall(article)[0])  # дата
+
+        return metadata
 
     def get_text(self, url):
-        article = self.open_site(self.main_site + url)
-#   СЮДАААААААААААААААААААААААААААААААААААА
+        text = []
+
+        self.browser.get(self.main_site + url)
+        WebDriverWait(self.browser, self.timeout)
+
+        for expr in self.expr_for_text:
+            text.extend(expr.findall(self.browser.page_source))
+
+        parsed_article = ['\n\n'.join(text).encode('utf-8')]
+        parsed_article.extend(self.get_metadata(self.open_site(self.main_site + url)))
+
+        return parsed_article
 
     def get_news(self, since, by):
 
@@ -193,7 +218,6 @@ class Kommersant(Base):
         list_all_parsed = []
 
         for index in range(len(list_of_days)):
-
             # нужная дата
             day = list_of_days[index][2]
             month = list_of_days[index][1]
@@ -211,13 +235,18 @@ class Kommersant(Base):
 
             list_daily_news.extend(expr_for_list_daily_news.findall(block_of_news[0]))
 
+        cracked_urls = []
         for url in list_daily_news:
             print url
-            list_all_parsed.append(self.get_text(url))
+            try:
+                list_all_parsed.append(self.get_text(url))
+            except:
+                cracked_urls.append(url)
 
-        return list_daily_news
+        open('crack_kommersant.txt', 'w').write('\n'.join(cracked_urls))
+
+        return list_all_parsed
+
 
 a = Kommersant()
 lt = a.get_news('14.01.2015', '14.01.2015')
-
-
