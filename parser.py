@@ -248,5 +248,38 @@ class Kommersant(Base):
         return list_all_parsed
 
 
+# =========================================================================================================
+#                К О Р Р Е С П О Н Д Е Н Т
+# =========================================================================================================
+class Korrespondent(Base):
+    main_site = 'http://korrespondent.net'
+    months = {'01': 'january',
+              '02': 'february',
+              '03': 'march',
+              '04': 'april',
+              '05': 'may',
+              '06': 'june',
+              '07': 'july',
+              '08': 'august',
+              '09': 'september',
+              '10': 'october',
+              '11': 'novenber',
+              '12': 'december'}
+
+    def get_news(self, since, by):
+
+        list_of_days, day_out = self.make_days_list(since, by)[0], self.make_days_list(since, by)[1]
+        list_daily_news = []
+        list_all_parsed = []
+
+        for index in range(len(list_of_days)):
+            # нужная дата
+            day = str(int(list_of_days[index][2]))  # ноль спереди не нужен
+            month = self.months[list_of_days[index][1]] # нужно словом
+            year = list_of_days[index][0]
+
+            # общий сайт, где собраны все новости одного дня
+            site_list_daily_news = 'http://korrespondent.net/all/' + year + '/' + month + '/' + day
+
 a = Kommersant()
 lt = a.get_news('14.01.2015', '14.01.2015')
