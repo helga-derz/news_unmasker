@@ -56,11 +56,11 @@ class Base:
 
 
 # =========================================================================================================
-#                Р И А - Н О В О С Т И
+#                Р И А - Н О В О С Т И (страницы иногда не догружаются, новости не все)
 # =========================================================================================================
 class Ria(Base):
     main_site = 'http://ria.ru'
-    timeout = 50
+    timeout = 15
 
     exprs_for_text = (
         re.compile('<h1.+</h1>'),
@@ -142,7 +142,7 @@ class Ria(Base):
         list_daily_news = []
         list_of_days, day_out = self.make_days_list(since, by)[0], self.make_days_list(since, by)[1]
 
-        for index in range(len(list_of_days)):
+        for index in xrange(len(list_of_days)):
             # нужная дата
             day = list_of_days[index][2]
             month = list_of_days[index][1]
@@ -172,12 +172,12 @@ class Ria(Base):
 
 
 # =========================================================================================================
-#                К О М М Е Р С А Н Т
+#                К О М М Е Р С А Н Т (зависает, нужен таймаут загрузки страницы)
 # =========================================================================================================
 
 class Kommersant(Base):
-    main_site = 'http://www.kommersant.ru'
     timeout = 50
+    main_site = 'http://www.kommersant.ru'
 
     # регулярка для заголовка и тела статьи
     expr_for_text = re.compile('<title>.+</title>'), \
@@ -217,7 +217,7 @@ class Kommersant(Base):
         list_daily_news = []
         list_all_parsed = []
 
-        for index in range(len(list_of_days)):
+        for index in xrange(len(list_of_days)):
             # нужная дата
             day = list_of_days[index][2]
             month = list_of_days[index][1]
