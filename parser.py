@@ -213,7 +213,7 @@ class Kommersant(Base):
 
     def get_news(self, since, by):
 
-        list_of_days, day_out = self.make_days_list(since, by)[0], self.make_days_list(since, by)[1]
+        list_of_days = self.make_days_list(since, by)[0]
         list_daily_news = []
         list_all_parsed = []
 
@@ -263,13 +263,20 @@ class Korrespondent(Base):
               '08': 'august',
               '09': 'september',
               '10': 'october',
-              '11': 'novenber',
+              '11': 'november',
               '12': 'december'}
+              
+    timeout = 10
+              
+    # регулярка для кнопки перехода на следующую страницу            
+    expr_for_forward_page_button = re.compile('<a class="pagination__link pagination__forward" href = "http://korrespondent.net/all/2015/november/4/p[0-9]+/"></a>')
+    
+    # регулярка для ссылок на статьи
+    expr_for_article = re.compile('<a href="' + main_site + '(.+)" class="article__img-link">')           
 
     def get_news(self, since, by):
 
-        list_of_days, day_out = self.make_days_list(since, by)[0], self.make_days_list(since, by)[1]
-        list_daily_news = []
+        list_of_days = self.make_days_list(since, by)[0]
         list_all_parsed = []
 
         for index in range(len(list_of_days)):
@@ -281,5 +288,23 @@ class Korrespondent(Base):
             # общий сайт, где собраны все новости одного дня
             site_list_daily_news = 'http://korrespondent.net/all/' + year + '/' + month + '/' + day
 
-a = Kommersant()
-lt = a.get_news('14.01.2015', '14.01.2015')
+            # подгружаем все странички и собираем ссылки на статьи за день
+            self.browser.get(site_list_daily_news)
+            WebDriverWait(self.browser, self.timeout)            
+            
+            # собраем ссылки с первой страницы
+            list_daily_news = self.expr_for_article.findall(self.browser.page_source)            
+            
+            # проходим все странички
+            while self.expr_for_forward_page_button.findall(self.browser.page_source):
+                print 1
+                button = self.browser.find_element_by_class_name('pagination__item_last pagination__item')
+                button.click()
+                list_daily_news.extend(self.expr_for_article.findall(self.browser.page_source))
+                
+            print list_daily_news
+        
+        return len(list_daily_news)
+
+a = Korrespondent()
+print a.get_news('17.11.2015', '17.11.2015')
