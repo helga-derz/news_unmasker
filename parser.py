@@ -9,6 +9,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 class Base:
     browser = Firefox()
+    timeout = 50
     hdr = {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 Gecko) Chrome/23.0.1271.64 Safari/537.11',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -50,7 +51,7 @@ class Base:
     def open_site(self, url):
 
         req = urllib2.Request(url, headers=self.hdr)
-        page = urllib2.urlopen(req)
+        page = urllib2.urlopen(req, timeout=self.timeout)
 
         return str(page.read())
 
@@ -60,7 +61,7 @@ class Base:
 # =========================================================================================================
 class Ria(Base):
     main_site = 'http://ria.ru'
-    timeout = 15
+    timeout = 50
 
     exprs_for_text = (
         re.compile('<h1.+</h1>'),
@@ -92,8 +93,8 @@ class Ria(Base):
 
         # пока не появятся новости предыдущих дней
         while len(expr_current_day.findall(self.browser.page_source)) != 0 and \
-                expr_current_day.findall(self.browser.page_source)[-1] == \
-                expr_other_day.findall(self.browser.page_source)[-1]:
+                        expr_current_day.findall(self.browser.page_source)[-1] == \
+                        expr_other_day.findall(self.browser.page_source)[-1]:
 
             try:
                 button = self.browser.find_element_by_class_name('list_pagination_next')
@@ -181,7 +182,7 @@ class Kommersant(Base):
 
     # регулярка для заголовка и тела статьи
     expr_for_text = re.compile('<title>.+</title>'), \
-        re.compile('<div id="divLetterBranding">(.+)</div>.+<!-- RSS Link -->', re.DOTALL)
+                    re.compile('<div id="divLetterBranding">(.+)</div>.+<!-- RSS Link -->', re.DOTALL)
 
     # МЕТАДАТА
     # регулярка для даты
@@ -265,46 +266,83 @@ class Korrespondent(Base):
               '10': 'october',
               '11': 'november',
               '12': 'december'}
-              
-    timeout = 10
-              
-    # регулярка для кнопки перехода на следующую страницу            
-    expr_for_forward_page_button = re.compile('<a class="pagination__link pagination__forward" href = "http://korrespondent.net/all/2015/november/4/p[0-9]+/"></a>')
-    
+
+    timeout = 50
+
     # регулярка для ссылок на статьи
-    expr_for_article = re.compile('<a href="' + main_site + '(.+)" class="article__img-link">')           
+    expr_for_article = re.compile('<h3><a href="([^"]+)">')
+
+    # регулярка для заголовков
+    expr_for_text = re.compile('<title>.+</title>'), re.compile('<h2>.+</h2>')
+
+    # регулярка для тела статьи
+    expr_for_body = re.compile('<p>.+</p>', re.DOTALL)
+
+    # регулярка для времени
+    expr_for_time = re.compile(', ([0-9]+:[0-9]+).', re.DOTALL)
+
+    def get_text(self, url):
+
+        text = []
+        article = self.open_site(url)
+
+        for expr in self.expr_for_text:
+            text.append(expr.findall(article)[0])
+
+        text.extend(self.expr_for_body.findall(article))
+
+        return '\n\n'.join(text)
 
     def get_news(self, since, by):
 
         list_of_days = self.make_days_list(since, by)[0]
-        list_all_parsed = []
+        list_daily_news_with_metadata = []
+        cracked_urls = []
 
         for index in range(len(list_of_days)):
             # нужная дата
             day = str(int(list_of_days[index][2]))  # ноль спереди не нужен
-            month = self.months[list_of_days[index][1]] # нужно словом
+            month = self.months[list_of_days[index][1]]  # нужно словом
             year = list_of_days[index][0]
 
             # общий сайт, где собраны все новости одного дня
             site_list_daily_news = 'http://korrespondent.net/all/' + year + '/' + month + '/' + day
 
-            # подгружаем все странички и собираем ссылки на статьи за день
-            self.browser.get(site_list_daily_news)
-            WebDriverWait(self.browser, self.timeout)            
-            
-            # собраем ссылки с первой страницы
-            list_daily_news = self.expr_for_article.findall(self.browser.page_source)            
-            
-            # проходим все странички
-            while self.expr_for_forward_page_button.findall(self.browser.page_source):
-                print 1
-                button = self.browser.find_element_by_class_name('pagination__item_last pagination__item')
-                button.click()
-                list_daily_news.extend(self.expr_for_article.findall(self.browser.page_source))
-                
-            print list_daily_news
-        
-        return len(list_daily_news)
+            # собираем статьи с первой страницы
+            page = self.open_site(site_list_daily_news)
+            list_daily_news = self.expr_for_article.findall(page)
+
+            # прибавляем метадату к статьям на первой странице
+            # (на страничке статьи она не всегда есть, поэтому ищем в списке ссылок)
+            expr_for_time = re.compile(', ([0-9]+:[0-9]+).', re.DOTALL)
+            date = list_of_days[index][2] + '.' + list_of_days[index][1] + '.' + list_of_days[index][0]
+
+            list_of_times = expr_for_time.findall(page)
+            for index_news in xrange(len(list_daily_news)):
+                try:
+                    text = self.get_text(list_daily_news[index_news])
+                    list_daily_news_with_metadata.append([text, list_of_times[index_news], date])
+                except:
+                    cracked_urls.append(list_daily_news[index_news])
+
+            # проходим по всем страницам этой даты
+            page_number = 2
+            while re.compile('href="(' + site_list_daily_news + '/p' + str(page_number) + '/)">').findall(page):
+                page = self.open_site(site_list_daily_news + '/p' + str(page_number) + '/')
+                list_daily_news = self.expr_for_article.findall(page)
+
+                list_of_times = expr_for_time.findall(page)
+                for index_news in xrange(len(list_daily_news)):
+                    try:
+                        text = self.get_text(list_daily_news[index_news])
+                        list_daily_news_with_metadata.append([text, list_of_times[index_news], date])
+                    except:
+                        cracked_urls.append(list_daily_news[index_news])
+                page_number += 1
+
+        open('crack_korrespondent.txt', 'w').write('\n'.join(cracked_urls))
+        return list_daily_news_with_metadata
+
 
 a = Korrespondent()
-print a.get_news('17.11.2015', '17.11.2015')
+lt = a.get_news('17.01.2015', '18.01.2015')
