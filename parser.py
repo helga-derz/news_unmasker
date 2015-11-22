@@ -5,9 +5,13 @@ import urllib2
 import datetime
 from selenium.webdriver import Firefox
 from selenium.webdriver.support.ui import WebDriverWait
+import logging
 
 
 class Base:
+    logging.basicConfig(format=u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s %(message)s', level=logging.DEBUG,
+                        filename='parser_log.log', filemode='w')
+
     browser = Firefox()
     timeout = 50
     hdr = {
@@ -16,6 +20,20 @@ class Base:
         'Accept-Charset': 'utf-8;q=0.7,*;q=0.3',
         'Accept-Encoding': 'none',
         'Connection': 'close'}
+
+    NAMES_OF_MONTHS = {'01': 'january',
+                       '02': 'february',
+                       '03': 'march',
+                       '04': 'april',
+                       '05': 'may',
+                       '06': 'june',
+                       '07': 'july',
+                       '08': 'august',
+                       '09': 'september',
+                       '10': 'october',
+                       '11': 'november',
+                       '12': 'december'
+                       }
 
     def __init__(self):
         pass
@@ -70,7 +88,7 @@ class Ria(Base):
     expr_for_main_block = re.compile('>([А-Я]+\-*[А-Я]+\-*[А-Я]+,.+)</div><div id="facebook-userbar-article-end"',
                                      re.DOTALL)
     expr_for_parsing_main_block = re.compile('<p>.+</p>')
-    # ненужные вставки в текст статьи    
+    # ненужные вставки в текст статьи
     expr_for_brief = re.compile('(<div id="inject_.+</div>)[А-я]+')
 
     # для метадаты   "article_header_time">12:03</span>14.10.2014</time>
@@ -254,18 +272,6 @@ class Kommersant(Base):
 # =========================================================================================================
 class Korrespondent(Base):
     main_site = 'http://korrespondent.net'
-    months = {'01': 'january',
-              '02': 'february',
-              '03': 'march',
-              '04': 'april',
-              '05': 'may',
-              '06': 'june',
-              '07': 'july',
-              '08': 'august',
-              '09': 'september',
-              '10': 'october',
-              '11': 'november',
-              '12': 'december'}
 
     timeout = 50
 
@@ -281,6 +287,15 @@ class Korrespondent(Base):
     # регулярка для времени
     expr_for_time = re.compile(', ([0-9]+:[0-9]+).', re.DOTALL)
 
+    def parsing_date(self, split_date):
+
+        day = split_date[2].strip('0')  # ноль спереди не нужен
+        month = self.NAMES_OF_MONTHS[split_date[1]]  # нужно словом
+        year = split_date[0]
+
+        return day, month, year
+
+    # получаем текст статьи
     def get_text(self, url):
 
         text = []
@@ -293,56 +308,54 @@ class Korrespondent(Base):
 
         return '\n\n'.join(text)
 
+    # проходим по спискам со статьями (метадата здесь)
+    def scrolling_pages(self, page, date):
+
+        list_daily_news = self.expr_for_article.findall(page)
+        list_of_times = self.expr_for_time.findall(page)
+        temp_list_news_metadata =[]
+
+        for index_news in xrange(len(list_daily_news)):
+            try:
+                text = self.get_text(list_daily_news[index_news])
+                temp_list_news_metadata.append([text, list_of_times[index_news], date])
+            except:
+                logging.error(list_daily_news[index_news])
+
+        return temp_list_news_metadata
+
     def get_news(self, since, by):
 
         list_of_days = self.make_days_list(since, by)[0]
         list_daily_news_with_metadata = []
-        cracked_urls = []
 
         for index in range(len(list_of_days)):
             # нужная дата
-            day = str(int(list_of_days[index][2]))  # ноль спереди не нужен
-            month = self.months[list_of_days[index][1]]  # нужно словом
-            year = list_of_days[index][0]
+            day, month, year = self.parsing_date(list_of_days[index])
+            date = list_of_days[index][2] + '.' + list_of_days[index][1] + '.' + list_of_days[index][0]
 
             # общий сайт, где собраны все новости одного дня
             site_list_daily_news = 'http://korrespondent.net/all/' + year + '/' + month + '/' + day
 
             # собираем статьи с первой страницы
             page = self.open_site(site_list_daily_news)
-            list_daily_news = self.expr_for_article.findall(page)
-
-            # прибавляем метадату к статьям на первой странице
-            # (на страничке статьи она не всегда есть, поэтому ищем в списке ссылок)
-            expr_for_time = re.compile(', ([0-9]+:[0-9]+).', re.DOTALL)
-            date = list_of_days[index][2] + '.' + list_of_days[index][1] + '.' + list_of_days[index][0]
-
-            list_of_times = expr_for_time.findall(page)
-            for index_news in xrange(len(list_daily_news)):
-                try:
-                    text = self.get_text(list_daily_news[index_news])
-                    list_daily_news_with_metadata.append([text, list_of_times[index_news], date])
-                except:
-                    cracked_urls.append(list_daily_news[index_news])
+            list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
 
             # проходим по всем страницам этой даты
             page_number = 2
             while re.compile('href="(' + site_list_daily_news + '/p' + str(page_number) + '/)">').findall(page):
                 page = self.open_site(site_list_daily_news + '/p' + str(page_number) + '/')
-                list_daily_news = self.expr_for_article.findall(page)
 
-                list_of_times = expr_for_time.findall(page)
-                for index_news in xrange(len(list_daily_news)):
-                    try:
-                        text = self.get_text(list_daily_news[index_news])
-                        list_daily_news_with_metadata.append([text, list_of_times[index_news], date])
-                    except:
-                        cracked_urls.append(list_daily_news[index_news])
+                list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
+
                 page_number += 1
 
-        open('crack_korrespondent.txt', 'w').write('\n'.join(cracked_urls))
         return list_daily_news_with_metadata
 
 
 a = Korrespondent()
-lt = a.get_news('17.01.2015', '18.01.2015')
+lt = a.get_news('17.01.2015', '17.01.2015')
+for i in lt:
+    print i
+
+print len(lt)
