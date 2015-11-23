@@ -9,8 +9,10 @@ import logging
 
 
 class Base:
-    logging.basicConfig(format=u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s %(message)s', level=logging.DEBUG,
-                        filename='parser_log.log', filemode='w')
+    logging.basicConfig(format=u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s %(message)s',
+                        level=logging.DEBUG,
+                        filename='parser_log.log',
+                        filemode='w')
 
     browser = Firefox()
     timeout = 50
