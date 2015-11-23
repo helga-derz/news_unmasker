@@ -5,16 +5,37 @@ import urllib2
 import datetime
 from selenium.webdriver import Firefox
 from selenium.webdriver.support.ui import WebDriverWait
+import logging
 
 
 class Base:
+    logging.basicConfig(format=u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s %(message)s',
+                        level=logging.DEBUG,
+                        filename='parser_log.log',
+                        filemode='w')
+
     browser = Firefox()
+    timeout = 50
     hdr = {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 Gecko) Chrome/23.0.1271.64 Safari/537.11',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Charset': 'utf-8;q=0.7,*;q=0.3',
         'Accept-Encoding': 'none',
         'Connection': 'close'}
+
+    NAMES_OF_MONTHS = {'01': 'january',
+                       '02': 'february',
+                       '03': 'march',
+                       '04': 'april',
+                       '05': 'may',
+                       '06': 'june',
+                       '07': 'july',
+                       '08': 'august',
+                       '09': 'september',
+                       '10': 'october',
+                       '11': 'november',
+                       '12': 'december'
+                       }
 
     def __init__(self):
         pass
@@ -50,7 +71,7 @@ class Base:
     def open_site(self, url):
 
         req = urllib2.Request(url, headers=self.hdr)
-        page = urllib2.urlopen(req)
+        page = urllib2.urlopen(req, timeout=self.timeout)
 
         return str(page.read())
 
@@ -60,7 +81,7 @@ class Base:
 # =========================================================================================================
 class Ria(Base):
     main_site = 'http://ria.ru'
-    timeout = 15
+    timeout = 50
 
     exprs_for_text = (
         re.compile('<h1.+</h1>'),
@@ -69,7 +90,7 @@ class Ria(Base):
     expr_for_main_block = re.compile('>([А-Я]+\-*[А-Я]+\-*[А-Я]+,.+)</div><div id="facebook-userbar-article-end"',
                                      re.DOTALL)
     expr_for_parsing_main_block = re.compile('<p>.+</p>')
-    # ненужные вставки в текст статьи    
+    # ненужные вставки в текст статьи
     expr_for_brief = re.compile('(<div id="inject_.+</div>)[А-я]+')
 
     # для метадаты   "article_header_time">12:03</span>14.10.2014</time>
@@ -92,8 +113,8 @@ class Ria(Base):
 
         # пока не появятся новости предыдущих дней
         while len(expr_current_day.findall(self.browser.page_source)) != 0 and \
-                expr_current_day.findall(self.browser.page_source)[-1] == \
-                expr_other_day.findall(self.browser.page_source)[-1]:
+                        expr_current_day.findall(self.browser.page_source)[-1] == \
+                        expr_other_day.findall(self.browser.page_source)[-1]:
 
             try:
                 button = self.browser.find_element_by_class_name('list_pagination_next')
@@ -181,7 +202,7 @@ class Kommersant(Base):
 
     # регулярка для заголовка и тела статьи
     expr_for_text = re.compile('<title>.+</title>'), \
-        re.compile('<div id="divLetterBranding">(.+)</div>.+<!-- RSS Link -->', re.DOTALL)
+                    re.compile('<div id="divLetterBranding">(.+)</div>.+<!-- RSS Link -->', re.DOTALL)
 
     # МЕТАДАТА
     # регулярка для даты
@@ -213,7 +234,7 @@ class Kommersant(Base):
 
     def get_news(self, since, by):
 
-        list_of_days, day_out = self.make_days_list(since, by)[0], self.make_days_list(since, by)[1]
+        list_of_days = self.make_days_list(since, by)[0]
         list_daily_news = []
         list_all_parsed = []
 
@@ -248,5 +269,95 @@ class Kommersant(Base):
         return list_all_parsed
 
 
-a = Kommersant()
-lt = a.get_news('14.01.2015', '14.01.2015')
+# =========================================================================================================
+#                К О Р Р Е С П О Н Д Е Н Т
+# =========================================================================================================
+class Korrespondent(Base):
+    main_site = 'http://korrespondent.net'
+
+    timeout = 50
+
+    # регулярка для ссылок на статьи
+    expr_for_article = re.compile('<h3><a href="([^"]+)">')
+
+    # регулярка для заголовков
+    expr_for_text = re.compile('<title>.+</title>'), re.compile('<h2>.+</h2>')
+
+    # регулярка для тела статьи
+    expr_for_body = re.compile('<p>.+</p>', re.DOTALL)
+
+    # регулярка для времени
+    expr_for_time = re.compile(', ([0-9]+:[0-9]+).', re.DOTALL)
+
+    def parsing_date(self, split_date):
+
+        day = split_date[2].strip('0')  # ноль спереди не нужен
+        month = self.NAMES_OF_MONTHS[split_date[1]]  # нужно словом
+        year = split_date[0]
+
+        return day, month, year
+
+    # получаем текст статьи
+    def get_text(self, url):
+
+        text = []
+        article = self.open_site(url)
+
+        for expr in self.expr_for_text:
+            text.append(expr.findall(article)[0])
+
+        text.extend(self.expr_for_body.findall(article))
+
+        return '\n\n'.join(text)
+
+    # проходим по спискам со статьями (метадата здесь)
+    def scrolling_pages(self, page, date):
+
+        list_daily_news = self.expr_for_article.findall(page)
+        list_of_times = self.expr_for_time.findall(page)
+        temp_list_news_metadata =[]
+
+        for index_news in xrange(len(list_daily_news)):
+            try:
+                text = self.get_text(list_daily_news[index_news])
+                temp_list_news_metadata.append([text, list_of_times[index_news], date])
+            except:
+                logging.error(list_daily_news[index_news])
+
+        return temp_list_news_metadata
+
+    def get_news(self, since, by):
+
+        list_of_days = self.make_days_list(since, by)[0]
+        list_daily_news_with_metadata = []
+
+        for index in range(len(list_of_days)):
+            # нужная дата
+            day, month, year = self.parsing_date(list_of_days[index])
+            date = list_of_days[index][2] + '.' + list_of_days[index][1] + '.' + list_of_days[index][0]
+
+            # общий сайт, где собраны все новости одного дня
+            site_list_daily_news = 'http://korrespondent.net/all/' + year + '/' + month + '/' + day
+
+            # собираем статьи с первой страницы
+            page = self.open_site(site_list_daily_news)
+            list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
+
+            # проходим по всем страницам этой даты
+            page_number = 2
+            while re.compile('href="(' + site_list_daily_news + '/p' + str(page_number) + '/)">').findall(page):
+                page = self.open_site(site_list_daily_news + '/p' + str(page_number) + '/')
+
+                list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
+
+                page_number += 1
+
+        return list_daily_news_with_metadata
+
+
+a = Korrespondent()
+lt = a.get_news('17.01.2015', '17.01.2015')
+for i in lt:
+    print i
+
+print len(lt)
