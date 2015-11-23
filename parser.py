@@ -355,9 +355,94 @@ class Korrespondent(Base):
         return list_daily_news_with_metadata
 
 
-a = Korrespondent()
-lt = a.get_news('17.01.2015', '17.01.2015')
-for i in lt:
-    print i
+# =========================================================================================================
+#                И Н Т Е Р Ф А К С
+# =========================================================================================================
+class Interfax(Base):
+    main_site = 'http://www.interfax.ru'
 
+    timeout = 50
+
+    # регулярка для ссылок на статьи
+    expr_for_article = re.compile('</span><a href="(.+)" id=')
+
+    # регулярка для заголовков
+    expr_for_text = re.compile('<title>.+</title>'), re.compile('<h1 class="textMTitle" itemprop="headline">.+</h1>')
+
+    # регулярка для тела статьи
+    expr_for_body = re.compile('itemprop="articleBody">(.+\.)</p>', re.DOTALL)
+
+    # регулярка для времени
+    expr_for_time = re.compile('<div><span>([0-9]+:[0-9]+)</span><a')
+
+    def parsing_date(self, split_date):
+
+        day = split_date[2]
+        month = split_date[1]
+        year = split_date[0]
+
+        return day, month, year
+
+    # получаем текст статьи
+    def get_text(self, url):
+
+        text = []
+        article = self.open_site(self.main_site + url).decode('cp1251').encode('utf-8')
+
+        for expr in self.expr_for_text:
+            findings = expr.findall(article)
+            if not findings == []:
+                text.append(findings[0])
+
+        text.extend(self.expr_for_body.findall(article))
+
+        return '\n\n'.join(text)
+
+    # проходим по спискам со статьями (метадата здесь)
+    def scrolling_pages(self, page, date):
+
+        list_daily_news = self.expr_for_article.findall(page)
+        list_of_times = self.expr_for_time.findall(page)
+        temp_list_news_metadata =[]
+
+        for index_news in xrange(len(list_daily_news)):
+            try:
+                text = self.get_text(list_daily_news[index_news])
+                temp_list_news_metadata.append([text, list_of_times[index_news], date])
+            except:
+                logging.error(list_daily_news[index_news])
+
+        return temp_list_news_metadata
+
+    def get_news(self, since, by):
+
+        list_of_days = self.make_days_list(since, by)[0]
+        list_daily_news_with_metadata = []
+
+        for index in range(len(list_of_days)):
+            # нужная дата
+            day, month, year = self.parsing_date(list_of_days[index])
+            date = list_of_days[index][2] + '.' + list_of_days[index][1] + '.' + list_of_days[index][0]
+
+            # общий сайт, где собраны все новости одного дня
+            site_list_daily_news = 'http://www.interfax.ru/news/' + year + '/' + month + '/' + day
+
+            # собираем статьи с первой страницы
+            page = self.open_site(site_list_daily_news)
+            list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
+
+            # проходим по всем страницам этой даты
+            page_number = 2
+            while re.compile('/all/page_' + str(page_number)).findall(page):
+                page = self.open_site(site_list_daily_news + '/all/page_' + str(page_number))
+
+                list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
+
+                page_number += 1
+
+        return list_daily_news_with_metadata
+
+
+a = Interfax()
+lt = a.get_news('22.11.2015', '23.11.2015')
 print len(lt)
