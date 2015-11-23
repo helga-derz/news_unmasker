@@ -221,11 +221,10 @@ class Kommersant(Base):
     def get_text(self, url):
         text = []
 
-        self.browser.get(self.main_site + url)
-        WebDriverWait(self.browser, self.timeout)
+        article = self.open_site(self.main_site + url).decode('cp1251').encode('utf-8')
 
         for expr in self.expr_for_text:
-            text.extend(expr.findall(self.browser.page_source))
+            text.extend(expr.findall(article))
 
         parsed_article = ['\n\n'.join(text).encode('utf-8')]
         parsed_article.extend(self.get_metadata(self.open_site(self.main_site + url)))
@@ -443,6 +442,7 @@ class Interfax(Base):
         return list_daily_news_with_metadata
 
 
-a = Interfax()
-lt = a.get_news('22.11.2015', '23.11.2015')
+a = Kommersant()
+lt = a.get_news('22.11.2015', '22.11.2015')
 print len(lt)
+print lt[0][0]
