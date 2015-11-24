@@ -195,78 +195,82 @@ class Ria(Base):
 # =========================================================================================================
 #                К О М М Е Р С А Н Т (зависает, нужен таймаут загрузки страницы)
 # =========================================================================================================
-
 class Kommersant(Base):
     timeout = 50
     main_site = 'http://www.kommersant.ru'
 
-    # регулярка для заголовка и тела статьи
-    expr_for_text = re.compile('<title>.+</title>'), \
-                    re.compile('<div id="divLetterBranding">(.+)</div>.+<!-- RSS Link -->', re.DOTALL)
+    # регулярка для блока разметки с новостями(там ищем ссылки на статьи)
+    expr_for_block_news = re.compile('<h3 class="subtitle"><a href="/news">.+<div class="col_group hide1 hide2">',
+                                     re.DOTALL)
 
-    # МЕТАДАТА
-    # регулярка для даты
-    expr_for_date = re.compile('([0-9]+\.[0-9]+\.[0-9]+), [0-9]+:[0-9]+')
+    # регулярка для ссылок на статьи
+    expr_for_article = re.compile('<h3 class="article_subheader"><a href="(/news/[0-9]+)">')
+
+    # регулярка для заголовка
+    expr_for_text = re.compile('<title>.+</title>')
+
+    # регулярка для тела статьи
+    expr_for_body = re.compile('<div id="divLetterBranding" class="article_text_wrapper">(.+)<!-- RSS Link -->',
+                               re.DOTALL)
+
     # регулярка для времени
-    expr_for_time = re.compile('[0-9]+\.[0-9]+\.[0-9]+, ([0-9]+:[0-9]+)')
+    expr_for_time = re.compile('">([0-9]+:[0-9]+)</a></time>')
 
-    def get_metadata(self, article):
-        metadata = []
+    def parsing_date(self, split_date):
 
-        metadata.append(self.expr_for_time.findall(article)[0])  # время
-        metadata.append(self.expr_for_date.findall(article)[0])  # дата
+        day = split_date[2]
+        month = split_date[1]
+        year = split_date[0]
 
-        return metadata
+        return day, month, year
 
+    # получаем текст статьи
     def get_text(self, url):
+
         text = []
+        article = self.open_site(self.main_site + url).decode('cp1251').encode('utf-8')
 
-        self.browser.get(self.main_site + url)
-        WebDriverWait(self.browser, self.timeout)
+        text.extend(self.expr_for_text.findall(article))
+        text.extend(self.expr_for_body.findall(article))
 
-        for expr in self.expr_for_text:
-            text.extend(expr.findall(self.browser.page_source))
+        return '\n\n'.join(text)
 
-        parsed_article = ['\n\n'.join(text).encode('utf-8')]
-        parsed_article.extend(self.get_metadata(self.open_site(self.main_site + url)))
+    # проходим по спискам со статьями (метадата здесь)
+    def scrolling_pages(self, page, date):
 
-        return parsed_article
+        block_of_news = self.expr_for_block_news.findall(page)[0]
+
+        list_daily_news = self.expr_for_article.findall(block_of_news)
+        list_of_times = self.expr_for_time.findall(block_of_news)
+        temp_list_news_metadata = []
+
+        for index_news in xrange(len(list_daily_news)):
+            try:
+                text = self.get_text(list_daily_news[index_news])
+                temp_list_news_metadata.append([text, list_of_times[index_news], date])
+            except:
+                logging.error(list_daily_news[index_news])
+
+        return temp_list_news_metadata
 
     def get_news(self, since, by):
 
         list_of_days = self.make_days_list(since, by)[0]
-        list_daily_news = []
-        list_all_parsed = []
+        list_daily_news_with_metadata = []
 
-        for index in xrange(len(list_of_days)):
+        for index in range(len(list_of_days)):
             # нужная дата
-            day = list_of_days[index][2]
-            month = list_of_days[index][1]
-            year = list_of_days[index][0]
+            day, month, year = self.parsing_date(list_of_days[index])
+            date = list_of_days[index][2] + '.' + list_of_days[index][1] + '.' + list_of_days[index][0]
 
             # общий сайт, где собраны все новости одного дня
             site_list_daily_news = 'http://www.kommersant.ru/archive/news/77/' + year + '-' + month + '-' + day
 
-            # получаем блок со ссылками на новости этого дня
-            expr_for_block_list_daily_news = re.compile('<section class="b-other_docs">.+</section>', re.DOTALL)
-            block_of_news = expr_for_block_list_daily_news.findall(self.open_site(site_list_daily_news))
+            # собираем статьи с первой страницы (на этом сайте страница всегда одна)
+            page = self.open_site(site_list_daily_news)
+            list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
 
-            # получаем ссылки на все новости этого дня
-            expr_for_list_daily_news = re.compile('<h3 class="article_subheader"><a href="(/news/[0-9]+)">')
-
-            list_daily_news.extend(expr_for_list_daily_news.findall(block_of_news[0]))
-
-        cracked_urls = []
-        for url in list_daily_news:
-            print url
-            try:
-                list_all_parsed.append(self.get_text(url))
-            except:
-                cracked_urls.append(url)
-
-        open('crack_kommersant.txt', 'w').write('\n'.join(cracked_urls))
-
-        return list_all_parsed
+        return list_daily_news_with_metadata
 
 
 # =========================================================================================================
@@ -315,7 +319,7 @@ class Korrespondent(Base):
 
         list_daily_news = self.expr_for_article.findall(page)
         list_of_times = self.expr_for_time.findall(page)
-        temp_list_news_metadata =[]
+        temp_list_news_metadata = []
 
         for index_news in xrange(len(list_daily_news)):
             try:
@@ -403,7 +407,7 @@ class Interfax(Base):
 
         list_daily_news = self.expr_for_article.findall(page)
         list_of_times = self.expr_for_time.findall(page)
-        temp_list_news_metadata =[]
+        temp_list_news_metadata = []
 
         for index_news in xrange(len(list_daily_news)):
             try:
@@ -443,6 +447,7 @@ class Interfax(Base):
         return list_daily_news_with_metadata
 
 
-a = Interfax()
+a = Kommersant()
 lt = a.get_news('22.11.2015', '23.11.2015')
 print len(lt)
+print lt[10][0]
