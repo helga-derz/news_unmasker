@@ -76,6 +76,25 @@ class Base:
         return str(page.read())
 
 
+class SimpleSites(Base):
+
+    # проходим по спискам со статьями (метадата здесь)
+    def scrolling_pages(self, page, date):
+
+        list_daily_news = self.expr_for_article.findall(page)
+        list_of_times = self.expr_for_time.findall(page)
+        temp_list_news_metadata = []
+
+        for index_news in xrange(len(list_daily_news)):
+            try:
+                text = self.get_text(list_daily_news[index_news])
+                temp_list_news_metadata.append([text, list_of_times[index_news], date])
+            except:
+                logging.error(list_daily_news[index_news])
+
+        return temp_list_news_metadata
+
+
 # =========================================================================================================
 #                Р И А - Н О В О С Т И (страницы иногда не догружаются, новости не все)
 # =========================================================================================================
@@ -193,7 +212,7 @@ class Ria(Base):
 
 
 # =========================================================================================================
-#                К О М М Е Р С А Н Т (зависает, нужен таймаут загрузки страницы)
+#                К О М М Е Р С А Н Т
 # =========================================================================================================
 class Kommersant(Base):
     timeout = 50
@@ -276,7 +295,7 @@ class Kommersant(Base):
 # =========================================================================================================
 #                К О Р Р Е С П О Н Д Е Н Т
 # =========================================================================================================
-class Korrespondent(Base):
+class Korrespondent(SimpleSites):
     main_site = 'http://korrespondent.net'
 
     timeout = 50
@@ -314,22 +333,6 @@ class Korrespondent(Base):
 
         return '\n\n'.join(text)
 
-    # проходим по спискам со статьями (метадата здесь)
-    def scrolling_pages(self, page, date):
-
-        list_daily_news = self.expr_for_article.findall(page)
-        list_of_times = self.expr_for_time.findall(page)
-        temp_list_news_metadata = []
-
-        for index_news in xrange(len(list_daily_news)):
-            try:
-                text = self.get_text(list_daily_news[index_news])
-                temp_list_news_metadata.append([text, list_of_times[index_news], date])
-            except:
-                logging.error(list_daily_news[index_news])
-
-        return temp_list_news_metadata
-
     def get_news(self, since, by):
 
         list_of_days = self.make_days_list(since, by)[0]
@@ -362,7 +365,7 @@ class Korrespondent(Base):
 # =========================================================================================================
 #                И Н Т Е Р Ф А К С
 # =========================================================================================================
-class Interfax(Base):
+class Interfax(SimpleSites):
     main_site = 'http://www.interfax.ru'
 
     timeout = 50
@@ -401,22 +404,6 @@ class Interfax(Base):
         text.extend(self.expr_for_body.findall(article))
 
         return '\n\n'.join(text)
-
-    # проходим по спискам со статьями (метадата здесь)
-    def scrolling_pages(self, page, date):
-
-        list_daily_news = self.expr_for_article.findall(page)
-        list_of_times = self.expr_for_time.findall(page)
-        temp_list_news_metadata = []
-
-        for index_news in xrange(len(list_daily_news)):
-            try:
-                text = self.get_text(list_daily_news[index_news])
-                temp_list_news_metadata.append([text, list_of_times[index_news], date])
-            except:
-                logging.error(list_daily_news[index_news])
-
-        return temp_list_news_metadata
 
     def get_news(self, since, by):
 
