@@ -10,12 +10,10 @@ import logging
 
 class Base:
     logging.basicConfig(format=u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s %(message)s',
-                        level=logging.DEBUG,
+                        level=logging.ERROR,
                         filename='parser_log.log',
                         filemode='w')
 
-    browser = Firefox()
-    timeout = 50
     hdr = {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 Gecko) Chrome/23.0.1271.64 Safari/537.11',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -40,8 +38,15 @@ class Base:
     def __init__(self):
         pass
 
-    def make_days_list(self, date1, date2):  # возвращает список дат между первой и второй включительно
+    # нужно для открытия конкретных статей
+    def open_site(self, url, timeout):
+        req = urllib2.Request(url, headers=self.hdr)
+        page = urllib2.urlopen(req, timeout=timeout)
 
+        return str(page.read())
+
+    # возвращает список дат между первой и второй включительно
+    def make_days_list(self, date1, date2):
         year1, year2 = int(date1.split('.')[2]), int(date2.split('.')[2])
         month1, month2 = int(date1.split('.')[1]), int(date2.split('.')[1])
         day1, day2 = int(date1.split('.')[0]), int(date2.split('.')[0])
@@ -67,17 +72,16 @@ class Base:
 
         return dates, day_out
 
-    # нужно для открытия конкретных статей
-    def open_site(self, url):
+    # делим кортеж с датой на три числа
+    def parsing_date(self, split_date):
+        day = split_date[2]
+        month = split_date[1]
+        year = split_date[0]
 
-        req = urllib2.Request(url, headers=self.hdr)
-        page = urllib2.urlopen(req, timeout=self.timeout)
-
-        return str(page.read())
+        return day, month, year
 
 
 class SimpleSites(Base):
-
     # проходим по спискам со статьями (метадата здесь)
     def scrolling_pages(self, page, date):
 
@@ -150,7 +154,7 @@ class Ria(Base):
     def get_text(self, url):
 
         text = []
-        article = self.open_site(self.main_site + url)
+        article = self.open_site(self.main_site + url, self.timeout)
 
         for expr in self.exprs_for_text:
             text.extend(list(set(expr.findall(article))))
@@ -174,6 +178,8 @@ class Ria(Base):
 
     # получаем ссылки на статьи с привязкой к дате
     def get_news(self, since, by):  # даты разделять точкой (после года не ставить)
+
+        browser = Firefox()
 
         blocks = ['/politics/', '/society/', '/economy/', '/world/', '/incidents/', '/sport/', '/studies/',
                   '/earth/', '/space/', '/optical_technologies/', '/culture/', '/religion_news/']
@@ -199,22 +205,20 @@ class Ria(Base):
                 list_daily_news.extend(list(set(expr_for_list_daily_news.findall(
                     site_list_daily_news))))  # сет потому, что некоторые ссылки находит дважды
 
-        cracked_urls = []
         for url in list_daily_news:
             print url
             try:
                 list_all_parsed.append(self.get_text(url))
             except:
-                cracked_urls.append(url)
+                logging.error(list_daily_news[url])
 
-        open('crack_ria.txt', 'w').write('\n'.join(cracked_urls))
         return list_all_parsed
 
 
 # =========================================================================================================
 #                К О М М Е Р С А Н Т
 # =========================================================================================================
-class Kommersant(Base):
+class Kommersant(SimpleSites):
     timeout = 50
     main_site = 'http://www.kommersant.ru'
 
@@ -235,42 +239,16 @@ class Kommersant(Base):
     # регулярка для времени
     expr_for_time = re.compile('">([0-9]+:[0-9]+)</a></time>')
 
-    def parsing_date(self, split_date):
-
-        day = split_date[2]
-        month = split_date[1]
-        year = split_date[0]
-
-        return day, month, year
-
     # получаем текст статьи
     def get_text(self, url):
 
         text = []
-        article = self.open_site(self.main_site + url).decode('cp1251').encode('utf-8')
+        article = self.open_site(self.main_site + url, self.timeout).decode('cp1251').encode('utf-8')
 
         text.extend(self.expr_for_text.findall(article))
         text.extend(self.expr_for_body.findall(article))
 
-        return '\n\n'.join(text)
-
-    # проходим по спискам со статьями (метадата здесь)
-    def scrolling_pages(self, page, date):
-
-        block_of_news = self.expr_for_block_news.findall(page)[0]
-
-        list_daily_news = self.expr_for_article.findall(block_of_news)
-        list_of_times = self.expr_for_time.findall(block_of_news)
-        temp_list_news_metadata = []
-
-        for index_news in xrange(len(list_daily_news)):
-            try:
-                text = self.get_text(list_daily_news[index_news])
-                temp_list_news_metadata.append([text, list_of_times[index_news], date])
-            except:
-                logging.error(list_daily_news[index_news])
-
-        return temp_list_news_metadata
+        return '\n'.join(text)
 
     def get_news(self, since, by):
 
@@ -286,8 +264,9 @@ class Kommersant(Base):
             site_list_daily_news = 'http://www.kommersant.ru/archive/news/77/' + year + '-' + month + '-' + day
 
             # собираем статьи с первой страницы (на этом сайте страница всегда одна)
-            page = self.open_site(site_list_daily_news)
-            list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
+            page = self.open_site(site_list_daily_news, self.timeout)
+            block_of_news = self.expr_for_block_news.findall(page)[0]
+            list_daily_news_with_metadata.extend(self.scrolling_pages(block_of_news, date))
 
         return list_daily_news_with_metadata
 
@@ -312,26 +291,18 @@ class Korrespondent(SimpleSites):
     # регулярка для времени
     expr_for_time = re.compile(', ([0-9]+:[0-9]+).', re.DOTALL)
 
-    def parsing_date(self, split_date):
-
-        day = split_date[2].strip('0')  # ноль спереди не нужен
-        month = self.NAMES_OF_MONTHS[split_date[1]]  # нужно словом
-        year = split_date[0]
-
-        return day, month, year
-
     # получаем текст статьи
     def get_text(self, url):
 
         text = []
-        article = self.open_site(url)
+        article = self.open_site(url, self.timeout)
 
         for expr in self.expr_for_text:
             text.append(expr.findall(article)[0])
 
         text.extend(self.expr_for_body.findall(article))
 
-        return '\n\n'.join(text)
+        return '\n'.join(text)
 
     def get_news(self, since, by):
 
@@ -341,19 +312,22 @@ class Korrespondent(SimpleSites):
         for index in range(len(list_of_days)):
             # нужная дата
             day, month, year = self.parsing_date(list_of_days[index])
+            day = day.strip('0')
+            month = self.NAMES_OF_MONTHS[month]
+
             date = list_of_days[index][2] + '.' + list_of_days[index][1] + '.' + list_of_days[index][0]
 
             # общий сайт, где собраны все новости одного дня
             site_list_daily_news = 'http://korrespondent.net/all/' + year + '/' + month + '/' + day
 
             # собираем статьи с первой страницы
-            page = self.open_site(site_list_daily_news)
+            page = self.open_site(site_list_daily_news, self.timeout)
             list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
 
             # проходим по всем страницам этой даты
             page_number = 2
             while re.compile('href="(' + site_list_daily_news + '/p' + str(page_number) + '/)">').findall(page):
-                page = self.open_site(site_list_daily_news + '/p' + str(page_number) + '/')
+                page = self.open_site(site_list_daily_news + '/p' + str(page_number) + '/', self.timeout)
 
                 list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
 
@@ -382,19 +356,11 @@ class Interfax(SimpleSites):
     # регулярка для времени
     expr_for_time = re.compile('<div><span>([0-9]+:[0-9]+)</span><a')
 
-    def parsing_date(self, split_date):
-
-        day = split_date[2]
-        month = split_date[1]
-        year = split_date[0]
-
-        return day, month, year
-
     # получаем текст статьи
     def get_text(self, url):
 
         text = []
-        article = self.open_site(self.main_site + url).decode('cp1251').encode('utf-8')
+        article = self.open_site(self.main_site + url, self.timeout).decode('cp1251').encode('utf-8')
 
         for expr in self.expr_for_text:
             findings = expr.findall(article)
@@ -403,7 +369,7 @@ class Interfax(SimpleSites):
 
         text.extend(self.expr_for_body.findall(article))
 
-        return '\n\n'.join(text)
+        return '\n'.join(text)
 
     def get_news(self, since, by):
 
@@ -419,13 +385,13 @@ class Interfax(SimpleSites):
             site_list_daily_news = 'http://www.interfax.ru/news/' + year + '/' + month + '/' + day
 
             # собираем статьи с первой страницы
-            page = self.open_site(site_list_daily_news)
+            page = self.open_site(site_list_daily_news, self.timeout)
             list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
 
             # проходим по всем страницам этой даты
             page_number = 2
             while re.compile('/all/page_' + str(page_number)).findall(page):
-                page = self.open_site(site_list_daily_news + '/all/page_' + str(page_number))
+                page = self.open_site(site_list_daily_news + '/all/page_' + str(page_number), self.timeout)
 
                 list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
 
@@ -434,7 +400,7 @@ class Interfax(SimpleSites):
         return list_daily_news_with_metadata
 
 
-a = Kommersant()
+a = Interfax()
 lt = a.get_news('22.11.2015', '23.11.2015')
 print len(lt)
 print lt[10][0]
