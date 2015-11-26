@@ -400,6 +400,35 @@ class Interfax(SimpleSites):
         return list_daily_news_with_metadata
 
 
+# =========================================================================================================
+#                Л Е Н Т А
+# =========================================================================================================
+class Lenta(SimpleSites):
+    main_site = 'http://lenta.ru'
+
+    timeout = 50
+    rubrics = ['/rubrics/russia/', '/rubrics/world/', '/rubrics/economics/', '/rubrics/business/', '/rubrics/ussr/',
+               '/rubrics/forces/', '/rubrics/science/', '/rubrics/sport/', '/rubrics/culture/', '/rubrics/media/',
+               '/rubrics/style/', '/rubrics/travel/', '/rubrics/life/']
+
+    # регулярка для ссылок на статьи
+    expr_for_article = re.compile('<h3><a href="/news/[^А-я]+">')
+
+    # регулярка для заголовка
+    expr_for_text = re.compile('<title>.+</title>')
+
+    # регулярка для тела статьи
+    expr_for_body = re.compile('', re.DOTALL)
+
+    # регулярка для "материалов по теме" в теле статьи (их нжно вырезать)
+    expr_for_useless = re.compile('')
+
+    # регулярка для времени
+    expr_for_time = re.compile('<span class="time">([0-9]+:[0-9]+)</span> [0-9]+ [а-я]+ [0-9]+</span></div><div class="titles"><h3><a href="/news/')
+
+
+
+
 a = Interfax()
 lt = a.get_news('22.11.2015', '23.11.2015')
 print len(lt)
