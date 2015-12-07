@@ -420,7 +420,8 @@ class Lenta(Base):
     # регулярка для "материалов по теме" в теле статьи (их нужно вырезать)
     expr_for_useless = re.compile('<aside class=.+</aside>'), \
             re.compile('<script.+</script>', re.DOTALL), \
-            re.compile('<div class="eagleplayer".+8".>', re.DOTALL)
+            re.compile('<div class="eagleplayer".+8".>', re.DOTALL), \
+            re.compile('<blockquote class=.+</blockquote>', re.DOTALL)
 
     # регулярка для времени
     expr_for_time = re.compile('pubdate=""> *([0-9]+:[0-9]+),')
@@ -437,7 +438,7 @@ class Lenta(Base):
         for expr in self.expr_for_useless:
             findings = expr.findall(body)
             for finding in findings:
-                body.replace(finding, '')  # это не работает. и нет, я не тупая
+                body = body.replace(finding, '')  # это не работает. и нет, я не тупая
 
         text.append(body)
 
@@ -472,3 +473,6 @@ class Lenta(Base):
 
 a = Lenta()
 lt = a.get_news('22.11.2015', '23.11.2015')
+for i in lt:
+    print i[0]
+    print '\n\n\n'
