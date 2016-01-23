@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import re
 import urllib2
 import datetime
-from selenium.webdriver import Firefox
-from selenium.webdriver.support.ui import WebDriverWait
 import logging
 
 
@@ -83,7 +80,7 @@ class Base:
 
 class SimpleSites(Base):
     # проходим по спискам со статьями (метадата здесь)
-    def scrolling_pages(self, page, date):
+    def scrolling_pages(self, page, date, main_site):
         list_daily_news = self.expr_for_article.findall(page)
         list_of_times = self.expr_for_time.findall(page)
         temp_list_news_metadata = []
@@ -91,7 +88,7 @@ class SimpleSites(Base):
         for index_news in xrange(len(list_daily_news)):
             try:
                 text = self.get_text(list_daily_news[index_news])
-                temp_list_news_metadata.append([text, list_of_times[index_news], date])
+                temp_list_news_metadata.append([text, list_of_times[index_news], date, main_site + list_daily_news[index_news]])
             except:
                 logging.error(list_daily_news[index_news])
 

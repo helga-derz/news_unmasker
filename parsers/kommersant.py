@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import re
-import parser.SimpleSites as SimpleSites
+import parser
 
 
-class Kommersant(SimpleSites):
+class Kommersant(parser.SimpleSites):
     timeout = 50
     main_site = 'http://www.kommersant.ru'
 
@@ -50,6 +50,7 @@ class Kommersant(SimpleSites):
             # собираем статьи с первой страницы (на этом сайте страница всегда одна)
             page = self.open_site(site_list_daily_news, self.timeout)
             block_of_news = self.expr_for_block_news.findall(page)[0]
-            list_daily_news_with_metadata.extend(self.scrolling_pages(block_of_news, date))
+            list_daily_news_with_metadata.extend(self.scrolling_pages(block_of_news, date, self.main_site))
 
         return list_daily_news_with_metadata
+

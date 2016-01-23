@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 
+import logging
 import re
-import parser.Base as Base
+import parser
 
 
-class Lenta(Base):
+class Lenta(parser.Base):
     main_site = 'http://lenta.ru'
 
     timeout = 50
@@ -42,11 +43,11 @@ class Lenta(Base):
         for expr in self.expr_for_useless:
             findings = expr.findall(body)
             for finding in findings:
-                body = body.replace(finding, '')  # это не работает. и нет, я не тупая
+                body = body.replace(finding, '')
 
         text.append(body)
 
-        return ['\n'.join(text), self.expr_for_time.findall(article)[0], date]
+        return ['\n'.join(text), self.expr_for_time.findall(article)[0], date, self.main_site + url]
 
     def get_news(self, since, by):
 

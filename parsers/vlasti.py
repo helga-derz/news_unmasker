@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import re
-import parser.SimpleSites as SimpleSites
+import parser
 
 
-class Vlasti(SimpleSites):
+class Vlasti(parser.SimpleSites):
     main_site = 'http://vlasti.net'
 
     timeout = 50
@@ -53,24 +53,16 @@ class Vlasti(SimpleSites):
 
             # собираем статьи с первой страницы
             page = self.open_site(site_list_daily_news, self.timeout)
-            list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
+            list_daily_news_with_metadata.extend(self.scrolling_pages(page, date, ''))
 
             # проходим по всем страницам этой даты
             page_number = 2
             while re.compile('/page/' + str(page_number)).findall(page):
                 page = self.open_site(site_list_daily_news + '/page/' + str(page_number), self.timeout)
 
-                list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
+                list_daily_news_with_metadata.extend(self.scrolling_pages(page, date, ''))
 
                 page_number += 1
 
         return list_daily_news_with_metadata
 
-
-a = Vlasti()
-lt = a.get_news('22.11.2015', '23.11.2015')
-for i in lt:
-    print i[0]
-    print i[1]
-    print i[2]
-    print '\n\n\n'
