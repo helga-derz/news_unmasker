@@ -1,0 +1,63 @@
+# -*- coding: utf-8 -*-
+
+import re
+import parser
+
+
+class Vedomosti(parser.SimpleSites):
+    main_site = 'http://www.vedomosti.ru'
+
+    timeout = 50
+
+    # регулярка для ссылок на статьи
+    expr_for_article = re.compile('<div class="b-article__title">\s+<a href="(.+)">')
+
+    # регулярка для заголовков
+    expr_for_text = re.compile('<title>.+</title>'), re.compile('<div class="subtitle">\s+(.+)\s+</div>')
+
+    # регулярка для тела статьи
+    expr_for_body = re.compile('(<p align="left">.+)</article>', re.DOTALL)
+
+    # регулярка для времени
+    expr_for_time = re.compile('<time class="date" datetime=.+([0-9]+:[0-9]+)</time>')
+
+    # регулярка для "материалов по теме" в теле статьи (их нужно вырезать)
+    expr_for_useless = re.compile('<div class="b-big-green-link no-print">.+</div>, re.DOTALL')
+
+    # получаем текст статьи
+    def get_text(self, url):
+
+        text = []
+        article = self.open_site(self.main_site + url, self.timeout)
+
+        for expr in self.expr_for_text:
+            findings = expr.findall(article)
+            if not findings == []:
+                text.append(findings[0])
+
+        text.extend(self.expr_for_body.findall(article))
+
+        return '\n'.join(text)
+
+    def get_news(self, since, by):
+
+        list_of_days = self.make_days_list(since, by)[0]
+        list_daily_news_with_metadata = []
+
+        for index in range(len(list_of_days)):
+            # нужная дата
+            day, month, year = self.parsing_date(list_of_days[index])
+            date = list_of_days[index][2] + '.' + list_of_days[index][1] + '.' + list_of_days[index][0]
+
+            # общий сайт, где собраны все новости одного дня
+            site_list_daily_news = 'http://www.vedomosti.ru/archive/' + year + '/' + month + '/' + day
+
+            # собираем статьи с первой страницы(тут всего одна)
+            page = self.open_site(site_list_daily_news, self.timeout)
+            list_daily_news_with_metadata.extend(self.scrolling_pages(page, date, self.main_site))
+
+        return list_daily_news_with_metadata
+
+a = Vedomosti()
+for i in a.get_news('01.12.2015.', '01.12.2015.'):
+    print i[0]
