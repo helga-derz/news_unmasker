@@ -1,19 +1,15 @@
 # -*- coding: utf-8 -*-
 
 import datetime
-import psql_functoins as psql
+from psql_functoins import Psql
 
 
 now_time = datetime.datetime.now()  # Текущая дата со временем
 date = now_time.strftime("%d.%m.%Y")  # форматируем дату
 time = now_time.strftime("%H:%M")  # форматируем время
 
+db = Psql()
 
-connection = psql.connect()
-cur = connection.cursor()
+db.insert_news('vlasti', date, time, '01.01.2014', '01.01.2014')
 
-psql.insert_news(cur, 'lenta', date, time, '01.01.2014', '01.01.2014')
-
-connection.commit()
-cur.close()
-psql.close_connection(connection)
+db.close_connection()
