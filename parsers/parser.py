@@ -93,3 +93,15 @@ class SimpleSites(Base):
                 logging.error(list_daily_news[index_news])
 
         return temp_list_news_metadata
+
+
+class NewsStructure:
+
+    def __init__(self):
+        now_time = datetime.datetime.now()
+        date = now_time.strftime("%d.%m.%Y")  # форматируем дату
+        time = now_time.strftime("%H:%M")  # форматируем время
+        publ_date = ''
+        publ_time = ''
+        text = ''
+        url = ''

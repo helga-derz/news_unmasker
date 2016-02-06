@@ -31,11 +31,11 @@ class Psql:
 
     def insert_news(self, name_parser, date, time, since, to):
         parser_instance = self.parsers[name_parser]
-        for item in parser_instance.get_news(since, to):
+        for feed in parser_instance.get_news(since, to):
             self.cur.execute("INSERT INTO texts " +
                         "(name_parser, download_date, download_time, text, publication_time, publication_date, url) " +
                         "VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                        (name_parser, date, time, item[0], item[1], item[2], item[3],))
+                        (name_parser, feed.date, feed.time, feed.text, feed.publ_time, feed.publ_date, feed.url,))
         self.conn.commit()
 
     def create_table(self, name_table, dict_columns, pr_key):

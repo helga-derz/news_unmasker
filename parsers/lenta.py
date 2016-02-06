@@ -47,7 +47,13 @@ class Lenta(parser.Base):
 
         text.append(body)
 
-        return ['\n'.join(text), self.expr_for_time.findall(article)[0], date, self.main_site + url]
+        feed = parser.NewsStructure()
+        feed.text = '\n'.join(text)
+        feed.publ_date = date
+        feed.publ_time = self.expr_for_time.findall(article)[0]
+        feed.url = self.main_site + url
+
+        return feed
 
     def get_news(self, since, by):
 
