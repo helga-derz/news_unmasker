@@ -99,9 +99,9 @@ class NewsStructure:
 
     def __init__(self):
         now_time = datetime.datetime.now()
-        date = now_time.strftime("%d.%m.%Y")  # форматируем дату
-        time = now_time.strftime("%H:%M")  # форматируем время
-        publ_date = ''
-        publ_time = ''
-        text = ''
-        url = ''
+        self.date = now_time.strftime("%d.%m.%Y")  # форматируем дату
+        self.time = now_time.strftime("%H:%M")  # форматируем время
+        self.publ_date = ''
+        self.publ_time = ''
+        self.text = ''
+        self.url = ''

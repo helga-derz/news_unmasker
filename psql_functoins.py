@@ -29,7 +29,7 @@ class Psql:
             self.conn.close()
         logging.info('close connection')
 
-    def insert_news(self, name_parser, date, time, since, to):
+    def insert_news(self, name_parser, since, to):
         parser_instance = self.parsers[name_parser]
         for feed in parser_instance.get_news(since, to):
             self.cur.execute("INSERT INTO texts " +

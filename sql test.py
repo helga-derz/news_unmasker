@@ -10,6 +10,6 @@ time = now_time.strftime("%H:%M")  # форматируем время
 
 db = Psql()
 
-db.insert_news('lenta', date, time, '01.01.2015', '01.01.2015')
+db.insert_news('lenta', '01.01.2015', '01.01.2015')
 
 db.close_connection()
