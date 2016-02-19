@@ -88,7 +88,8 @@ class SimpleSites(Base):
         for index_news in xrange(len(list_daily_news)):
             try:
                 text = self.get_text(list_daily_news[index_news])
-                temp_list_news_metadata.append([text, list_of_times[index_news], date, main_site + list_daily_news[index_news]])
+                temp_list_news_metadata.append(
+                    [text, list_of_times[index_news], date, main_site + list_daily_news[index_news]])
             except:
                 logging.error(list_daily_news[index_news])
 
@@ -96,7 +97,6 @@ class SimpleSites(Base):
 
 
 class NewsStructure:
-
     def __init__(self):
         now_time = datetime.datetime.now()
         self.date = now_time.strftime("%d.%m.%Y")  # форматируем дату

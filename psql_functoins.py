@@ -5,7 +5,7 @@ import logging
 from parsers import interfax, kommersant, korrespondent, lenta, ria, rt, vlasti
 
 
-class DbStructure:
+class DbArticleStructure:
 
     def __init__(self):
         self.id = ''
@@ -50,18 +50,6 @@ class Psql:
                 (name_parser, feed.date, feed.time, feed.text, feed.publ_time, feed.publ_date, feed.url,))
         self.conn.commit()
 
-    def create_table(self, name_table, dict_columns, pr_key):
-        columns = ''
-        for i in dict_columns:
-            columns += i + ' ' + dict_columns[i]  # making a string from dict
-            if i == pr_key:
-                columns += ' PRIMARY KEY, '  # add primary key
-            else:
-                columns += ', '
-
-        self.cur.execute('CREATE TABLE IF NOT EXISTS ' + name_table + ' (' + columns[:-2] + ');')
-        self.conn.commit()
-
     def select(self, **kwargs):  # параметры для сортировки - словарь ('name_parser': '= lenta')
 
         where_list = []
@@ -81,7 +69,7 @@ class Psql:
 
         for row in rows:
 
-            db_str = DbStructure()
+            db_str = DbArticleStructure()
 
             db_str.id = row[0]
             db_str.name_parser = row[1]
@@ -108,8 +96,8 @@ def adding_news(parser, since, to):
 
 db = Psql()
 
-coll = db.select(**{"name_parser": " = 'rt'", 'publication_date': " = '2014-12-31'"})
+coll = db.select(**{"name_parser": " = 'rt'", 'publication_date': " BETWEEN '2014-12-28' AND '2014-12-31'"})
 
-print coll[0].publ_time
+print len(coll)
 
 db.close_connection()
