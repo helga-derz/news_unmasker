@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import re
-import parser.SimpleSites as SimpleSites
+import parser
 
 
-class Korrespondent(SimpleSites):
+class Korrespondent(parser.SimpleSites):
     main_site = 'http://korrespondent.net'
 
     timeout = 50

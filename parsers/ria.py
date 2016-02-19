@@ -3,11 +3,11 @@
 from selenium.webdriver import Firefox
 from selenium.webdriver.support.ui import WebDriverWait
 import re
-import parser.Base as Base
+import parser
 import logging
 
 
-class Ria(Base):
+class Ria(parser.Base):
     main_site = 'http://ria.ru'
     timeout = 50
 

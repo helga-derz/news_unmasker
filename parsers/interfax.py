@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import re
-import parser.SimpleSites as SimpleSites
+import parser
 
 
-class Interfax(SimpleSites):
+class Interfax(parser.SimpleSites):
     main_site = 'http://www.interfax.ru'
 
     timeout = 50
@@ -51,14 +51,14 @@ class Interfax(SimpleSites):
 
             # собираем статьи с первой страницы
             page = self.open_site(site_list_daily_news, self.timeout)
-            list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
+            list_daily_news_with_metadata.extend(self.scrolling_pages(page, date, self.main_site))
 
             # проходим по всем страницам этой даты
             page_number = 2
             while re.compile('/all/page_' + str(page_number)).findall(page):
                 page = self.open_site(site_list_daily_news + '/all/page_' + str(page_number), self.timeout)
 
-                list_daily_news_with_metadata.extend(self.scrolling_pages(page, date))
+                list_daily_news_with_metadata.extend(self.scrolling_pages(page, date, self.main_site))
 
                 page_number += 1
 
