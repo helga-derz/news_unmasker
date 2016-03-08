@@ -19,7 +19,7 @@ class Kommersant(parser.SimpleSites):
     expr_for_text = re.compile('<title>.+</title>')
 
     # регулярка для тела статьи
-    expr_for_body = re.compile('<div id="divLetterBranding" class="article_text_wrapper">(.+)<!-- RSS Link -->',
+    expr_for_body = re.compile('(<div id="divLetterBranding".+)<!-- RSS Link -->',
                                re.DOTALL)
 
     # регулярка для времени

@@ -30,10 +30,10 @@ class Psql:
     parsers = {'interfax': interfax.Interfax(),
                'lenta': lenta.Lenta(),
                'kommersant': kommersant.Kommersant(),
-               'korrespondent': korrespondent.Korrespondent(),  # недоработанный
-               'ria': ria.Ria(),  # недоработанный
-               'rt': rt.Rt(),
-               'vlasti': vlasti.Vlasti()}  # кодировка иногда не та
+               # 'korrespondent': korrespondent.Korrespondent(),  # недоработанный
+               # 'ria': ria.Ria(),  # недоработанный
+               # 'vlasti': vlasti.Vlasti(),             # кодировка иногда не та
+               'rt': rt.Rt()}
 
     def close_connection(self):
         if self.conn:
@@ -92,12 +92,38 @@ def adding_news(parser, since, to):
 
     db.close_connection()
 
-# adding_news('lenta', '02.01.2015', '02.01.2015')
 
+adding_news('interfax', '17.05.2015', '16.06.2015')
+
+
+'''
 db = Psql()
 
-coll = db.select(**{"name_parser": " = 'rt'", 'publication_date': " BETWEEN '2014-12-28' AND '2014-12-31'"})
+coll = db.select(**{"name_parser": " = 'kommersant'", 'publication_date': " BETWEEN '2015-01-05' AND '2015-01-05'"})
 
-print len(coll)
+for i in coll:
+    print i.text
+    print '+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++'
 
 db.close_connection()
+
+'''
+'''
+db = Psql()
+
+dates = [('01.01.2015', '15.03.2015'), ('16.03.2015', '15.06.2015'), ('16.06.2015', '25.09.2015'), ('26.09.2015', '31.12.2015')]
+
+Done = False
+
+for date in dates:
+
+    while not Done:
+        try:
+            db.insert('interfax', date[0], date[1])
+            print 'done' + date[0] + ' - ' + date[1]
+            Done = True
+        except:
+            print 'ouch ' + date[0] + ' - ' + date[1]
+
+    Done = False
+'''

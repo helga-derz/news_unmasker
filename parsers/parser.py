@@ -88,8 +88,14 @@ class SimpleSites(Base):
         for index_news in xrange(len(list_daily_news)):
             try:
                 text = self.get_text(list_daily_news[index_news])
-                temp_list_news_metadata.append(
-                    [text, list_of_times[index_news], date, main_site + list_daily_news[index_news]])
+
+                feed = NewsStructure()
+                feed.text = text
+                feed.publ_time = list_of_times[index_news]
+                feed.publ_date = date
+                feed.url = main_site + list_daily_news[index_news]
+
+                temp_list_news_metadata.append(feed)
             except:
                 logging.error(list_daily_news[index_news])
 
