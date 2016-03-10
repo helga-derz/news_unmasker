@@ -17,7 +17,7 @@ def read_docs(name_dir):  # СЧИТЫВАЕМ ТЕКСТЫ НОВОСТИ
     for doc in list_docs:
         read_files.append(open('data/' + name_dir + '/' + doc, 'r').read())
 
-    return read_files
+    return read_files, list_docs
 
 
 def get_relations(name_dir):  # СЧИТЫВАЕМ ОТНОШЕНИЯ МЕЖДУ ФАЙЛАМИ
@@ -29,10 +29,11 @@ def get_relations(name_dir):  # СЧИТЫВАЕМ ОТНОШЕНИЯ МЕЖДУ
         matrix.append(i.split('\t'))
 
     count = 0
+    index_dir = name_dir.split('t')[1]
 
     for i in range(len(matrix) - 1):
         for j in range(len(matrix) - 1, count, -1):
-            relations[name_dir[-1] + '_' + str(i) + '.' + name_dir[-1] + '_' + str(j)] = matrix[i][j]
+            relations[index_dir + '-' + str(i) + '.' + index_dir + '-' + str(j)] = matrix[i][j]
         count += 1
 
     return relations
