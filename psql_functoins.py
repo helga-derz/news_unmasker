@@ -43,6 +43,21 @@ class TrainCorpusStructure:
         self.text = row[3]
 
 
+class RelationStructure:
+
+    def __init__(self):
+        self.id = ''
+        self.first_text = ''
+        self.second_text = ''
+        self.relation = ''
+
+    def split_row(self, row):
+        self.id = row[0]
+        self.first_text = row[1]
+        self.second_text = row[2]
+        self.relation = row[3]
+
+
 class Psql:
     def __init__(self):
         self.conn = psycopg2.connect("dbname='news' user='postgres' host='localhost' password='postgres'")
@@ -107,6 +122,31 @@ class Psql:
                 db_str.split_row(row)
 
                 sorted_collection.append(db_str)
+
+        return sorted_collection
+
+    def select_relations(self, name_table, **kwargs):
+
+        where_list = []
+        where_string = ' WHERE '
+
+        if not kwargs:   # когда нет условий
+            self.cur.execute("SELECT * FROM " + name_table)
+        else:
+            for item, condition in kwargs.items():
+                where_list.append(item + condition)
+
+            where_string += ' AND '.join(where_list)
+            self.cur.execute("SELECT * FROM " + name_table + where_string)
+
+        rows = self.cur.fetchall()
+        sorted_collection = []
+
+        for row in rows:
+            db_str = RelationStructure()
+            db_str.split_row(row)
+
+            sorted_collection.append(db_str)
 
         return sorted_collection
 
