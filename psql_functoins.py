@@ -2,10 +2,10 @@
 
 import psycopg2
 import logging
-from parsers import interfax, kommersant, korrespondent, lenta, ria, rt, vlasti
+from parsers import interfax, kommersant, lenta, rt  # korrespondent, ria, vlasti
 
 
-class DbArticleStructure:
+class ParsedArticleStructure:
 
     def __init__(self):
         self.id = ''
@@ -16,6 +16,31 @@ class DbArticleStructure:
         self.publ_time = ''
         self.publ_date = ''
         self.text = ''
+
+    def split_row(self, row):
+        self.id = row[0]
+        self.name_parser = row[1]
+        self.url = row[2]
+        self.dwnl_time = row[3]
+        self.dwnl_date = row[4]
+        self.publ_time = row[5]
+        self.publ_date = row[6]
+        self.text = row[7]
+
+
+class TrainCorpusStructure:
+
+    def __init__(self):
+        self.index_text = ''
+        self.index_dir = None
+        self.name = ''
+        self.text = ''
+
+    def split_row(self, row):
+        self.index_text = row[0]
+        self.index_dir = row[1]
+        self.name = row[2]
+        self.text = row[3]
 
 
 class Psql:
@@ -50,37 +75,38 @@ class Psql:
                 (name_parser, feed.date, feed.time, feed.text, feed.publ_time, feed.publ_date, feed.url,))
         self.conn.commit()
 
-    def select(self, **kwargs):  # параметры для сортировки - словарь ('name_parser': '= lenta')
+    def select_text(self, name_table, **kwargs):  # параметры для сортировки - словарь {'name_parser': '= lenta'}
 
         where_list = []
         where_string = ' WHERE '
 
         if not kwargs:   # когда нет условий
-            self.cur.execute("SELECT * FROM texts")
+            self.cur.execute("SELECT * FROM " + name_table)
         else:
             for item, condition in kwargs.items():
                 where_list.append(item + condition)
 
             where_string += ' AND '.join(where_list)
-            self.cur.execute("SELECT * FROM texts" + where_string)
+            self.cur.execute("SELECT * FROM " + name_table + where_string)
 
         rows = self.cur.fetchall()
         sorted_collection = []
 
-        for row in rows:
+        if name_table == 'texts':
+            for row in rows:
 
-            db_str = DbArticleStructure()
+                db_str = ParsedArticleStructure()
+                db_str.split_row(row)
 
-            db_str.id = row[0]
-            db_str.name_parser = row[1]
-            db_str.url = row[2]
-            db_str.dwnl_time = row[3]
-            db_str.dwnl_date = row[4]
-            db_str.publ_time = row[5]
-            db_str.publ_date = row[6]
-            db_str.text = row[7]
+                sorted_collection.append(db_str)
 
-            sorted_collection.append(db_str)
+        elif name_table == 'train_corpus':
+            for row in rows:
+
+                db_str = TrainCorpusStructure()
+                db_str.split_row(row)
+
+                sorted_collection.append(db_str)
 
         return sorted_collection
 
@@ -93,7 +119,7 @@ def adding_news(parser, since, to):
     db.close_connection()
 
 
-adding_news('interfax', '17.05.2015', '16.06.2015')
+# adding_news('interfax', '17.06.2015', '16.06.2015')
 
 
 '''
@@ -111,7 +137,7 @@ db.close_connection()
 '''
 db = Psql()
 
-dates = [('01.01.2015', '15.03.2015'), ('16.03.2015', '15.06.2015'), ('16.06.2015', '25.09.2015'), ('26.09.2015', '31.12.2015')]
+dates = [('21.06.2015', '15.08.2015'), ('16.08.2015', '15.10.2015'), ('16.10.2015', '31.12.2015')]
 
 Done = False
 
@@ -119,7 +145,7 @@ for date in dates:
 
     while not Done:
         try:
-            db.insert('interfax', date[0], date[1])
+            db.insert('rt', date[0], date[1])
             print 'done' + date[0] + ' - ' + date[1]
             Done = True
         except:
