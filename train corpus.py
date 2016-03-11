@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from psql_functoins import *
 import making_vectors as mv
 
