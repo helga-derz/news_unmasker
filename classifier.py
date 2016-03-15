@@ -76,6 +76,32 @@ def classificate(x_train, y_train, x_test):   # на вход ВЕКТОРЫ и 
     return model.predict(kernel_test)
 
 
+def kernel_train(x_train):
+    # loading kernel + fiting model
+    print "train kernel"
+
+    kernel_train = []
+    for vector in x_train:
+        t = []
+        for vector1 in x_train:
+            t.append(np.dot(vector, vector1))
+        kernel_train.append(t)
+
+    return kernel_train
+
+
+def kernel_test(x_train, x_test):
+    print "test kernel"
+
+    kernel_test = []
+    for vector in x_test:
+        t = []
+        for vector1 in x_train:
+            t.append(np.dot(vector, vector1))
+        kernel_test.append(t)
+
+    return kernel_test
+
 '''
 n = 0
 for i in range(len(y_predicted)):
